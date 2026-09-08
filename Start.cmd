@@ -253,7 +253,7 @@ echo.
 %en%echo Build: %build%   Arch: %arch%   Lang: %lang%
 %zh%echo 正在下载补丁…
 %en%echo Patches Downloading...
-call :ARIA2_DL "%metaFile%"
+call :ARIA2_DL_RETRY "%metaFile%"
 if %ERRORLEVEL% GTR 0 (
     call :DOWNLOAD_ERROR
     exit /b 1
@@ -268,20 +268,20 @@ rem === Download .NET Framework patches ===
 if "%build%" geq "19041" if "%build%" leq "22000" (
     if "%netfx481%" equ "1" (
         if exist "Scripts\netfx4.8.1\script_netfx4.8.1_%build%_%arch%.meta4" (
-            call :ARIA2_DL "Scripts\netfx4.8.1\script_netfx4.8.1_%build%_%arch%.meta4" neutral
-            if "%lang%" neq "en-US" call :ARIA2_DL "Scripts\netfx4.8.1\script_netfx4.8.1_%build%_%arch%.meta4" "%lang%"
+            call :ARIA2_DL_RETRY "Scripts\netfx4.8.1\script_netfx4.8.1_%build%_%arch%.meta4" neutral
+            if "%lang%" neq "en-US" call :ARIA2_DL_RETRY "Scripts\netfx4.8.1\script_netfx4.8.1_%build%_%arch%.meta4" "%lang%"
         ) else if exist "Scripts\netfx4.8\script_netfx4.8_%build%_%arch%.meta4" (
-            call :ARIA2_DL "Scripts\netfx4.8\script_netfx4.8_%build%_%arch%.meta4" neutral
+            call :ARIA2_DL_RETRY "Scripts\netfx4.8\script_netfx4.8_%build%_%arch%.meta4" neutral
         )
     ) else if "%netfx481%" neq "1" if exist "Scripts\netfx4.8\script_netfx4.8_%build%_%arch%.meta4" (
-        call :ARIA2_DL "Scripts\netfx4.8\script_netfx4.8_%build%_%arch%.meta4" neutral
+        call :ARIA2_DL_RETRY "Scripts\netfx4.8\script_netfx4.8_%build%_%arch%.meta4" neutral
     )
 )
 
 if "%build%" geq "14393" if "%build%" leq "17763" (
     if exist "Scripts\netfx4.8\script_netfx4.8_%build%_%arch%.meta4" (
-        call :ARIA2_DL "Scripts\netfx4.8\script_netfx4.8_%build%_%arch%.meta4" neutral
-        if "%lang%" neq "en-US" call :ARIA2_DL "Scripts\netfx4.8\script_netfx4.8_%build%_%arch%.meta4" "%lang%"
+        call :ARIA2_DL_RETRY "Scripts\netfx4.8\script_netfx4.8_%build%_%arch%.meta4" neutral
+        if "%lang%" neq "en-US" call :ARIA2_DL_RETRY "Scripts\netfx4.8\script_netfx4.8_%build%_%arch%.meta4" "%lang%"
     )
 )
 
@@ -298,6 +298,23 @@ goto :EXIT
 chcp %oldchcp% >nul
 call W10UI.cmd
 goto :EXIT
+
+:ARIA2_DL_RETRY
+rem %1 = meta4 路径 / meta4 path
+rem %2 = metalink 语言(可选)/ language (optional)
+rem Retry up to 5 attempts. Clear downloaded patches between attempts so that
+rem aria2 -c does not skip files that failed SHA-1 verification.
+set /a dlretry=0
+:ARIA2_DL_RETRY_LOOP
+set /a dlretry+=1
+if !dlretry! GTR 5 exit /b 1
+call :ARIA2_DL "%~1" %2
+if %ERRORLEVEL% EQU 0 exit /b 0
+if !dlretry! GEQ 5 exit /b 1
+%zh%echo 下载失败（第 !dlretry! 次/共 5 次），清除补丁文件后重试…
+%en%echo Download failed (attempt !dlretry!/5), clearing patches and retrying...
+del /q "%patchDir%\*.msu" "%patchDir%\*.cab" "%patchDir%\*.msu.aria2" "%patchDir%\*.cab.aria2" 2>nul
+goto :ARIA2_DL_RETRY_LOOP
 
 :ARIA2_DL
 rem %1 = meta4 路径 / meta4 path
